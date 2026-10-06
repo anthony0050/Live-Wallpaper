@@ -1,0 +1,12 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- phone frame -->
+    <path android:fillColor="#FFFFFF" android:pathData="M31,17 L77,17 Q83,17 83,23 L83,85 Q83,91 77,91 L31,91 Q25,91 25,85 L25,23 Q25,17 31,17 Z"/>
+    <path android:fillColor="#152238" android:pathData="M31,25 L77,25 L77,80 L31,80 Z"/>
+    <!-- play symbol -->
+    <path android:fillColor="#FFFFFF" android:pathData="M47,41 L68,53 L47,65 Z"/>
+    <!-- live/wallpaper waves -->
+    <path android:fillColor="#63D8FF" android:pathData="M34,70 Q43,62 52,70 Q61,78 74,67 L74,75 Q61,86 51,77 Q42,69 34,78 Z"/>
+    <path android:fillColor="#63D8FF" android:pathData="M46,21 L62,21 L62,23 L46,23 Z"/>
+</vector>

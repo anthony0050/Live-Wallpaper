@@ -1,13 +1,17 @@
-plugins { id("com.android.application") }
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+}
 
 android {
     namespace = "com.anthony.redmiwallpaper"
     compileSdk = 35
+
     defaultConfig {
         applicationId = "com.anthony.redmiwallpaper"
         minSdk = 29
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1"
+        versionCode = 2
+        versionName = "0.1.1"
     }
 }

@@ -1,16 +1,8 @@
-# Home Video Wallpaper v0.1
-Target test device: Redmi Note 14 Pro (24115RA8EG).
+# Redmi Video Wallpaper v0.1.1
 
-## Behavior
-- Video loops while Home live wallpaper is visible.
-- A genuine lock -> unlock grants one audio opportunity.
-- If Home is first shown after that unlock and DND is off, video restarts and audio plays once.
-- Ordinary App -> Home returns are silent.
-- DND consumes the unlock opportunity silently; turning DND off does not retroactively play audio.
-- Wallpaper pauses when hidden/locked.
+Test build for Redmi Note 14 Pro (24115RA8EG).
 
-## Build on GitHub
-Upload the whole project to a GitHub repository. Actions -> Build Android APK -> Run workflow (or push to main). Download the artifact after the build completes.
-
-## First install
-Open app -> ALLOW DND STATUS ACCESS -> enable access for Home Video Wallpaper -> return -> SET LIVE WALLPAPER -> apply to Home screen.
+## v0.1.1 fixes
+- Fixes startup crash by enabling the Kotlin Android Gradle plugin so MainActivity and VideoWallpaperService are packaged into the APK.
+- Adds a custom adaptive Live Wallpaper app icon.
+- Keeps the agreed playback behavior: Home-only video playback, one audible pass after a real lock/unlock cycle, ordinary App→Home returns silent, DND always silent, and pause while Home/screen is hidden.

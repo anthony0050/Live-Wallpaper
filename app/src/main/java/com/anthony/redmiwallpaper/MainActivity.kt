@@ -16,7 +16,7 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(48,48,48,48) }
-        box.addView(TextView(this).apply { text = "Home Video Wallpaper v0.1\n\nRedmi Note 14 Pro test build\n\n• Home: video loops\n• Unlock → first Home: audio once\n• App → Home: silent\n• DND: always silent\n• Screen off/Home hidden: pause"; textSize = 18f })
+        box.addView(TextView(this).apply { text = "Home Video Wallpaper v0.1.1\n\nRedmi Note 14 Pro test build\n\n• Home: video loops\n• Unlock → first Home: audio once\n• App → Home: silent\n• DND: always silent\n• Screen off/Home hidden: pause"; textSize = 18f })
         box.addView(Button(this).apply { text = "SET LIVE WALLPAPER"; setOnClickListener {
             startActivity(Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, ComponentName(this@MainActivity, VideoWallpaperService::class.java)))
         }})
