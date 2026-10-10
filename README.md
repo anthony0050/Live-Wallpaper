@@ -1,9 +1,13 @@
-# Redmi Video Wallpaper v0.1.7
+# Redmi Video Wallpaper v0.1.8 (source)
 
-Fixes wallpaper preview PREPARE EXCEPTION (Wallpapers do not support keep screen on) by using MediaPlayer.setSurface(holder.surface) instead of setDisplay(holder). Initialization waits for a valid, non-zero-size wallpaper surface.
+Build on GitHub Actions as before. Based on working v0.1.7 surface playback.
 
-Diagnostic test build: embedded MP4 plays muted and loops only while wallpaper engine is visible. Unlock-only audio and DND handling are not yet implemented.
+- Video loops muted only while wallpaper is visible (Preview can play muted).
+- A genuine screen-off -> ACTION_USER_PRESENT -> first Home visibility triggers one non-looping audio playback from embedded MP4, unless DND is enabled.
+- App -> Home without locking stays silent. Audio stops when Home is hidden, screen turns off, or DND is enabled. Turning DND off never replays skipped audio.
+- `WallpaperService` uses `MediaPlayer.setSurface` (not `setDisplay`).
+- Debug event history available in main app.
 
-Upload the **contents** of this ZIP to the root of your GitHub repository, preserving `.github/workflows/build-apk.yml`. Run the GitHub Actions APK build, install it, open Live Wallpaper Preview for 15 seconds, then return to the app and tap Refresh Wallpaper Diagnostics. Confirm video appears and provide diagnostic screenshot if it does not.
+Important: Android/HyperOS may vary in broadcast delivery and wallpaper visibility. This source is not yet compiled or tested on the Redmi Note 14 Pro. Check DND, unlock, screen-off and app-return behaviors on the phone. Some OEM builds may restrict unlock broadcasts or media audio playback from wallpaper services.
 
-Not yet compiled or device-tested.
+Upload ZIP contents to repository root, including hidden `.github` folder, then build via Actions.
