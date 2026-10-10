@@ -1,5 +1,7 @@
 package com.anthony.redmiwallpaper
 
+import android.graphics.Color
+import android.graphics.Paint
 import android.app.KeyguardManager
 import android.content.Context
 import android.media.MediaPlayer
@@ -10,7 +12,7 @@ import android.util.Log
 import android.view.SurfaceHolder
 
 /**
- * v0.1.4: video-only diagnostic build.
+ * v0.1.5: surface test pattern and timeline diagnostic build.
  * Audio is intentionally disabled until video rendering is verified on-device.
  */
 class VideoWallpaperService : WallpaperService() {
@@ -23,6 +25,7 @@ class VideoWallpaperService : WallpaperService() {
             Log.i(tag, message)
             getSharedPreferences("wallpaper_diagnostics", Context.MODE_PRIVATE).edit()
                 .putString("last_event", message)
+                .putString("history", ((getSharedPreferences("wallpaper_diagnostics", Context.MODE_PRIVATE).getString("history", "") ?: "") + "\n" + System.currentTimeMillis() + " " + message).takeLast(4500))
                 .putString("last_time", java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date()))
                 .apply()
         }
@@ -38,13 +41,17 @@ class VideoWallpaperService : WallpaperService() {
             super.onSurfaceCreated(holder)
             record("surfaceCreated valid=${holder.surface.isValid}")
             surfaceReady = true
-            startPreparing(holder)
+            drawTestPattern(holder)
+            main.postDelayed({ if (surfaceReady && !destroyed && player == null) startPreparing(holder) }, 4000)
         }
 
         override fun onSurfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
             super.onSurfaceChanged(holder, format, width, height)
             record("surfaceChanged ${width}x${height}")
-            if (surfaceReady && player == null) startPreparing(holder)
+            if (surfaceReady && player == null) {
+                drawTestPattern(holder)
+                main.postDelayed({ if (surfaceReady && !destroyed && player == null) startPreparing(holder) }, 4000)
+            }
             updatePlayback()
         }
 
@@ -53,6 +60,34 @@ class VideoWallpaperService : WallpaperService() {
             visibleNow = visible
             record("visibility=$visible preview=$isPreview")
             updatePlayback()
+        }
+
+        private fun drawTestPattern(holder: SurfaceHolder) {
+            var canvas: android.graphics.Canvas? = null
+            try {
+                canvas = holder.lockCanvas()
+                if (canvas == null) {
+                    record("TEST PATTERN: lockCanvas returned null")
+                    return
+                }
+                canvas.drawColor(Color.rgb(20, 75, 155))
+                val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.YELLOW
+                    textSize = 42f
+                    isFakeBoldText = true
+                }
+                canvas.drawText("WALLPAPER SURFACE OK", 24f, 110f, paint)
+                paint.color = Color.WHITE
+                paint.textSize = 30f
+                canvas.drawText("v0.1.5 - first 4 seconds", 24f, 165f, paint)
+                record("TEST PATTERN drawn ${canvas.width}x${canvas.height}")
+            } catch (e: Exception) {
+                record("TEST PATTERN ERROR ${e.javaClass.simpleName}: ${e.message}")
+            } finally {
+                if (canvas != null) try { holder.unlockCanvasAndPost(canvas) } catch (e: Exception) {
+                    record("unlockCanvasAndPost ERROR: ${e.message}")
+                }
+            }
         }
 
         private fun startPreparing(holder: SurfaceHolder) {
@@ -132,7 +167,9 @@ class VideoWallpaperService : WallpaperService() {
 
         override fun onSurfaceDestroyed(holder: SurfaceHolder) {
             surfaceReady = false
+            main.removeCallbacksAndMessages(null)
             releasePlayer()
+            record("surfaceDestroyed")
             super.onSurfaceDestroyed(holder)
         }
 

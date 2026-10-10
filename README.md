@@ -1,19 +1,11 @@
-# Redmi Video Wallpaper v0.1.4 — diagnostic build
+# Redmi Video Wallpaper v0.1.5 — Surface diagnostic
 
-Target: Redmi Note 14 Pro (24115RA8EG).
+Diagnostic only: no audio. Embedded MP4 unchanged.
 
-This is a **muted diagnostic build**. It does not implement unlock-once audio yet.
+1. Open app and test embedded MP4 (should play silently).
+2. Open live wallpaper preview and watch first 4 seconds. A BLUE screen with YELLOW "WALLPAPER SURFACE OK" text should appear before video preparation begins.
+3. Wait another 15 seconds. Return to app and refresh event history; screenshot it and the Preview result.
 
-## Test
-1. Install APK from GitHub Actions artifact.
-2. Open app, tap **TEST EMBEDDED MP4**. Observe moving video or error text.
-3. Tap **OPEN LIVE WALLPAPER PREVIEW**, wait 10–30 seconds, return to app.
-4. Tap **REFRESH WALLPAPER DIAGNOSTICS**, screenshot the displayed event.
+The test distinguishes whether wallpaper canvas can render at all from MediaPlayer video rendering. It does not claim to fix black video. Do not use this build as a final wallpaper.
 
-The embedded original `app/src/main/res/raw/wallpaper_video.mp4` is unchanged.
-
-## Planned after video works
-Video loops only when Home visible, pauses when hidden/screen off. Audio plays once after genuine lock/unlock only when Home first appears; ordinary app-to-Home is silent; DND always silent and exiting DND never retroactively plays sound. These are NOT implemented in this diagnostic build.
-
-## GitHub upload
-Upload project contents to repository root, preserving `.github/workflows/build-apk.yml` (hidden `.github` directory). Existing matching files should be overwritten.
+Upload extracted files to the repository root, preserving `.github/workflows/build-apk.yml`. Commit to trigger GitHub Actions.

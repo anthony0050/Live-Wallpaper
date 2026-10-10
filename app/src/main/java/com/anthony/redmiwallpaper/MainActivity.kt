@@ -27,7 +27,7 @@ class MainActivity : Activity() {
         }
         val scroller = ScrollView(this).apply { addView(root) }
         root.addView(TextView(this).apply {
-            text = "Home Video Wallpaper v0.1.4 — diagnostics\nAudio intentionally disabled in this test build."
+            text = "Home Video Wallpaper v0.1.5 — surface diagnostics\nAudio intentionally disabled in this test build."
             textSize = 19f
         })
         status = TextView(this).apply { text = "Embedded MP4: not tested"; textSize = 16f }
@@ -69,7 +69,7 @@ class MainActivity : Activity() {
             setOnClickListener { refreshStatus() }
         })
         root.addView(TextView(this).apply {
-            text = "Instructions: Test embedded MP4 here first. Then open Preview for 10 seconds, return here and tap Refresh. Screenshot both results."
+            text = "Instructions: Test embedded MP4 here first. Then open Preview for 15 seconds. Look for a BLUE screen with YELLOW text during the first 4 seconds., Return here and tap Refresh. Screenshot the event history and Preview."
         })
         setContentView(scroller)
         refreshStatus()
@@ -77,8 +77,8 @@ class MainActivity : Activity() {
 
     private fun refreshStatus() {
         val prefs = getSharedPreferences("wallpaper_diagnostics", MODE_PRIVATE)
-        wallpaperStatus.text = "Wallpaper last event:\n" +
-            prefs.getString("last_event", "No wallpaper engine event recorded yet") +
+        wallpaperStatus.text = "Wallpaper event history:\n" +
+            prefs.getString("history", "No wallpaper engine event recorded yet") +
             "\nEvent time (device): " + prefs.getString("last_time", "unknown")
     }
 
