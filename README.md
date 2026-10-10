@@ -1,7 +1,9 @@
-# Redmi Video Wallpaper v0.1.6
+# Redmi Video Wallpaper v0.1.7
 
-Diagnostic build: starts MediaPlayer directly on the wallpaper Surface (no canvas test pattern or delayed switch). MP4 embedded; audio muted intentionally.
+Fixes wallpaper preview PREPARE EXCEPTION (Wallpapers do not support keep screen on) by using MediaPlayer.setSurface(holder.surface) instead of setDisplay(holder). Initialization waits for a valid, non-zero-size wallpaper surface.
 
-Build via GitHub Actions, install APK, open Live Wallpaper Preview for 15 seconds, return to the app and press Refresh Wallpaper Diagnostics. Screenshot Preview and event history.
+Diagnostic test build: embedded MP4 plays muted and loops only while wallpaper engine is visible. Unlock-only audio and DND handling are not yet implemented.
 
-This build is not device-tested. The unlock-only audio and DND behavior are postponed until wallpaper video rendering works.
+Upload the **contents** of this ZIP to the root of your GitHub repository, preserving `.github/workflows/build-apk.yml`. Run the GitHub Actions APK build, install it, open Live Wallpaper Preview for 15 seconds, then return to the app and tap Refresh Wallpaper Diagnostics. Confirm video appears and provide diagnostic screenshot if it does not.
+
+Not yet compiled or device-tested.

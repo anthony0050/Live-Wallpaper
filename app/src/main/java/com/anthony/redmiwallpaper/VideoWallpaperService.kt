@@ -8,7 +8,7 @@ import android.service.wallpaper.WallpaperService
 import android.util.Log
 import android.view.SurfaceHolder
 
-/** v0.1.6: direct video output diagnostic. Audio is intentionally muted. */
+/** v0.1.7: wallpaper Surface rendering fix. Audio intentionally muted. */
 class VideoWallpaperService : WallpaperService() {
     override fun onCreateEngine(): Engine = VideoEngine()
 
@@ -38,7 +38,7 @@ class VideoWallpaperService : WallpaperService() {
             surfaceReady = holder.surface.isValid
             record("surfaceCreated valid=$surfaceReady preview=$isPreview")
             // Do not lockCanvas here: decoder must own the wallpaper surface.
-            if (surfaceReady) prepareVideo(holder)
+            if (surfaceReady && surfaceWidth > 0 && surfaceHeight > 0) prepareVideo(holder)
         }
 
         override fun onSurfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
@@ -47,7 +47,7 @@ class VideoWallpaperService : WallpaperService() {
             surfaceHeight = height
             surfaceReady = holder.surface.isValid
             record("surfaceChanged ${width}x${height} valid=$surfaceReady player=${player != null}")
-            if (surfaceReady && player == null) prepareVideo(holder)
+            if (surfaceReady && width > 0 && height > 0 && player == null) prepareVideo(holder)
             updatePlayback()
         }
 
@@ -59,7 +59,7 @@ class VideoWallpaperService : WallpaperService() {
         }
 
         private fun prepareVideo(holder: SurfaceHolder) {
-            if (!surfaceReady || destroyed || player != null) return
+            if (!surfaceReady || surfaceWidth <= 0 || surfaceHeight <= 0 || destroyed || player != null) return
             val token = ++generation
             record("prepare begin token=$token surface=${holder.surface.isValid} size=${surfaceWidth}x$surfaceHeight")
             try {
@@ -72,7 +72,8 @@ class VideoWallpaperService : WallpaperService() {
                 } finally {
                     afd.close()
                 }
-                mp.setDisplay(holder)
+                // setDisplay(holder) may call holder.setKeepScreenOn(true), which WallpaperService forbids.
+                mp.setSurface(holder.surface)
                 mp.setVolume(0f, 0f)
                 mp.isLooping = true
                 mp.setOnPreparedListener {
