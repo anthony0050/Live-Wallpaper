@@ -1,8 +1,7 @@
-# Redmi Video Wallpaper v0.1.1
+# Redmi Video Wallpaper v0.1.2 (test build)
 
-Test build for Redmi Note 14 Pro (24115RA8EG).
+For Redmi Note 14 Pro. Includes the original MP4 and adaptive icon.
 
-## v0.1.1 fixes
-- Fixes startup crash by enabling the Kotlin Android Gradle plugin so MainActivity and VideoWallpaperService are packaged into the APK.
-- Adds a custom adaptive Live Wallpaper app icon.
-- Keeps the agreed playback behavior: Home-only video playback, one audible pass after a real lock/unlock cycle, ordinary App→Home returns silent, DND always silent, and pause while Home/screen is hidden.
+Changes: Java/Kotlin JVM 17; use ACTION_USER_PRESENT for unlock tickets, SCREEN_OFF to clear tickets, and HOME visibility to pause video; check DND interruption filter without treating missing policy access as active DND. Mute after one video duration.
+
+**Testing caveats:** HyperOS may reorder USER_PRESENT and wallpaper visibility callbacks; this version is not yet tested on-device. DND status access can vary with OS permissions; if unavailable, audio fails silent. If HOME is visible when USER_PRESENT fires, the wallpaper may restart audio there. Use GitHub Actions to build the APK.
