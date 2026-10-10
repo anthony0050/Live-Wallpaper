@@ -10,7 +10,7 @@ import android.util.Log
 import android.view.SurfaceHolder
 
 /**
- * v0.1.3: video-only diagnostic build.
+ * v0.1.4: video-only diagnostic build.
  * Audio is intentionally disabled until video rendering is verified on-device.
  */
 class VideoWallpaperService : WallpaperService() {
@@ -19,6 +19,13 @@ class VideoWallpaperService : WallpaperService() {
     inner class VideoEngine : Engine() {
         private val tag = "RedmiWallpaper"
         private val main = Handler(Looper.getMainLooper())
+        private fun record(message: String) {
+            Log.i(tag, message)
+            getSharedPreferences("wallpaper_diagnostics", Context.MODE_PRIVATE).edit()
+                .putString("last_event", message)
+                .putString("last_time", java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date()))
+                .apply()
+        }
         private val keyguard by lazy { getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager }
         private var player: MediaPlayer? = null
         private var surfaceReady = false
@@ -29,14 +36,14 @@ class VideoWallpaperService : WallpaperService() {
 
         override fun onSurfaceCreated(holder: SurfaceHolder) {
             super.onSurfaceCreated(holder)
-            Log.i(tag, "surfaceCreated")
+            record("surfaceCreated valid=${holder.surface.isValid}")
             surfaceReady = true
             startPreparing(holder)
         }
 
         override fun onSurfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
             super.onSurfaceChanged(holder, format, width, height)
-            Log.i(tag, "surfaceChanged ${width}x${height}")
+            record("surfaceChanged ${width}x${height}")
             if (surfaceReady && player == null) startPreparing(holder)
             updatePlayback()
         }
@@ -44,13 +51,13 @@ class VideoWallpaperService : WallpaperService() {
         override fun onVisibilityChanged(visible: Boolean) {
             super.onVisibilityChanged(visible)
             visibleNow = visible
-            Log.i(tag, "visibility=$visible preview=$isPreview")
+            record("visibility=$visible preview=$isPreview")
             updatePlayback()
         }
 
         private fun startPreparing(holder: SurfaceHolder) {
             if (!holder.surface.isValid || destroyed) {
-                Log.w(tag, "Surface not valid yet")
+                record("Surface not valid yet")
                 return
             }
             releasePlayer()
@@ -73,19 +80,20 @@ class VideoWallpaperService : WallpaperService() {
                 p.setOnPreparedListener {
                     if (token != generation || destroyed) return@setOnPreparedListener
                     prepared = true
-                    Log.i(tag, "prepared duration=${it.duration} video=${it.videoWidth}x${it.videoHeight}")
+                    record("prepared duration=${it.duration} video=${it.videoWidth}x${it.videoHeight}")
                     updatePlayback()
                 }
                 p.setOnErrorListener { _, what, extra ->
-                    Log.e(tag, "MediaPlayer error what=$what extra=$extra")
+                    record("MediaPlayer ERROR what=$what extra=$extra")
                     true
                 }
                 p.setOnInfoListener { _, what, extra ->
-                    Log.i(tag, "MediaPlayer info what=$what extra=$extra")
+                    record("MediaPlayer info what=$what extra=$extra")
                     false
                 }
                 p.prepareAsync()
             } catch (e: Exception) {
+                record("prepare failed: ${e.javaClass.simpleName}: ${e.message}")
                 Log.e(tag, "prepare failed", e)
                 releasePlayer()
             }
@@ -100,14 +108,15 @@ class VideoWallpaperService : WallpaperService() {
             try {
                 if (canPlay) {
                     if (!p.isPlaying) {
-                        Log.i(tag, "play")
+                        record("play")
                         p.start()
                     }
                 } else if (p.isPlaying) {
-                    Log.i(tag, "pause")
+                    record("pause")
                     p.pause()
                 }
             } catch (e: Exception) {
+                record("playback transition failed: ${e.message}")
                 Log.e(tag, "playback transition failed", e)
             }
         }

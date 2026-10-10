@@ -1,26 +1,93 @@
 package com.anthony.redmiwallpaper
 
 import android.app.Activity
-import android.app.NotificationManager
 import android.app.WallpaperManager
 import android.content.ComponentName
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
-import android.provider.Settings
 import android.view.Gravity
+import android.view.ViewGroup
 import android.widget.Button
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.VideoView
 
 class MainActivity : Activity() {
+    private var video: VideoView? = null
+    private lateinit var status: TextView
+    private lateinit var wallpaperStatus: TextView
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(48,48,48,48) }
-        box.addView(TextView(this).apply { text = "Home Video Wallpaper v0.1.1\n\nRedmi Note 14 Pro test build\n\n• Home: video loops\n• Unlock → first Home: audio once\n• App → Home: silent\n• DND: always silent\n• Screen off/Home hidden: pause"; textSize = 18f })
-        box.addView(Button(this).apply { text = "SET LIVE WALLPAPER"; setOnClickListener {
-            startActivity(Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, ComponentName(this@MainActivity, VideoWallpaperService::class.java)))
-        }})
-        box.addView(Button(this).apply { text = "ALLOW DND STATUS ACCESS"; setOnClickListener { startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)) } })
-        setContentView(box)
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(28, 28, 28, 28)
+        }
+        val scroller = ScrollView(this).apply { addView(root) }
+        root.addView(TextView(this).apply {
+            text = "Home Video Wallpaper v0.1.4 — diagnostics\nAudio intentionally disabled in this test build."
+            textSize = 19f
+        })
+        status = TextView(this).apply { text = "Embedded MP4: not tested"; textSize = 16f }
+        root.addView(status)
+        video = VideoView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 550)
+            setOnPreparedListener { player ->
+                player.isLooping = true
+                player.setVolume(0f, 0f)
+                status.text = "Embedded MP4: PREPARED, ${player.duration} ms, ${player.videoWidth} x ${player.videoHeight}. Playing muted."
+                start()
+            }
+            setOnErrorListener { _, what, extra ->
+                status.text = "Embedded MP4: ERROR what=$what extra=$extra"
+                true
+            }
+            setOnCompletionListener { status.text = "Embedded MP4: completed" }
+        }.also { root.addView(it) }
+        root.addView(Button(this).apply {
+            text = "1. TEST EMBEDDED MP4"
+            setOnClickListener {
+                status.text = "Embedded MP4: loading..."
+                video?.setVideoURI(Uri.parse("android.resource://$packageName/${R.raw.wallpaper_video}"))
+                video?.start()
+            }
+        })
+        root.addView(Button(this).apply {
+            text = "2. OPEN LIVE WALLPAPER PREVIEW"
+            setOnClickListener {
+                startActivity(Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).putExtra(
+                    WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
+                    ComponentName(this@MainActivity, VideoWallpaperService::class.java)))
+            }
+        })
+        wallpaperStatus = TextView(this).apply { textSize = 15f; gravity = Gravity.START }
+        root.addView(wallpaperStatus)
+        root.addView(Button(this).apply {
+            text = "3. REFRESH WALLPAPER DIAGNOSTICS"
+            setOnClickListener { refreshStatus() }
+        })
+        root.addView(TextView(this).apply {
+            text = "Instructions: Test embedded MP4 here first. Then open Preview for 10 seconds, return here and tap Refresh. Screenshot both results."
+        })
+        setContentView(scroller)
+        refreshStatus()
+    }
+
+    private fun refreshStatus() {
+        val prefs = getSharedPreferences("wallpaper_diagnostics", MODE_PRIVATE)
+        wallpaperStatus.text = "Wallpaper last event:\n" +
+            prefs.getString("last_event", "No wallpaper engine event recorded yet") +
+            "\nEvent time (device): " + prefs.getString("last_time", "unknown")
+    }
+
+    override fun onPause() {
+        video?.pause()
+        super.onPause()
+    }
+    override fun onDestroy() {
+        video?.stopPlayback()
+        super.onDestroy()
     }
 }
