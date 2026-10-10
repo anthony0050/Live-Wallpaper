@@ -1,7 +1,19 @@
-# Redmi Video Wallpaper v0.1.2 (test build)
+# Redmi Video Wallpaper v0.1.3 — Video Diagnostic
 
-For Redmi Note 14 Pro. Includes the original MP4 and adaptive icon.
+For Redmi Note 14 Pro (24115RA8EG).
 
-Changes: Java/Kotlin JVM 17; use ACTION_USER_PRESENT for unlock tickets, SCREEN_OFF to clear tickets, and HOME visibility to pause video; check DND interruption filter without treating missing policy access as active DND. Mute after one video duration.
+## What changed
+- Fixes the likely black-screen cause: the video Surface is attached **before** asynchronous MediaPlayer preparation.
+- Handles Surface creation, resize, preview visibility and Home visibility separately.
+- Adds Android logcat diagnostics tagged `RedmiWallpaper`.
+- Video loops silently in both wallpaper Preview and Home.
+- **Audio / unlock / DND logic is intentionally disabled in this diagnostic build.** It will be restored after successful video playback testing.
 
-**Testing caveats:** HyperOS may reorder USER_PRESENT and wallpaper visibility callbacks; this version is not yet tested on-device. DND status access can vary with OS permissions; if unavailable, audio fails silent. If HOME is visible when USER_PRESENT fires, the wallpaper may restart audio there. Use GitHub Actions to build the APK.
+## Test
+1. Upload the extracted project files to the repository root, retaining `.github/workflows`.
+2. Build the debug APK with GitHub Actions.
+3. Open the app, enter Preview and confirm moving video.
+4. Set Home wallpaper and verify silent looping; open another app and return.
+5. If black screen persists, obtain logcat filtered by `RedmiWallpaper` (ADB) for diagnosis.
+
+This is a test build, not a final release. No successful device test is claimed.

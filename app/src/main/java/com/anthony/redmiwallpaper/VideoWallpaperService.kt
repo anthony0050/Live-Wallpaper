@@ -1,162 +1,135 @@
 package com.anthony.redmiwallpaper
 
 import android.app.KeyguardManager
-import android.app.NotificationManager
-import android.content.BroadcastReceiver
 import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import android.media.MediaPlayer
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.service.wallpaper.WallpaperService
+import android.util.Log
 import android.view.SurfaceHolder
 
+/**
+ * v0.1.3: video-only diagnostic build.
+ * Audio is intentionally disabled until video rendering is verified on-device.
+ */
 class VideoWallpaperService : WallpaperService() {
     override fun onCreateEngine(): Engine = VideoEngine()
 
     inner class VideoEngine : Engine() {
-        private var player: MediaPlayer? = null
-        private var holderRef: SurfaceHolder? = null
-        private var homeVisible = false
-        private var screenOn = true
-        private var pendingUnlockAudio = false
-        private var audioPlaying = false
-        private var receiverRegistered = false
-        private val handler = Handler(Looper.getMainLooper())
+        private val tag = "RedmiWallpaper"
+        private val main = Handler(Looper.getMainLooper())
         private val keyguard by lazy { getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager }
-        private val notificationManager by lazy { getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager }
-        private val muteAfterFirstLoop = Runnable { stopAudio() }
-        private val receiver = object : BroadcastReceiver() {
-            override fun onReceive(context: Context, intent: Intent) {
-                when (intent.action) {
-                    Intent.ACTION_SCREEN_OFF -> {
-                        screenOn = false
-                        pendingUnlockAudio = false
-                        pausePlayback()
-                    }
-                    Intent.ACTION_USER_PRESENT -> {
-                        screenOn = true
-                        pendingUnlockAudio = true
-                        // Visibility callbacks can arrive before USER_PRESENT on some launchers.
-                        handler.postDelayed({ updatePlayback() }, 250)
-                    }
-                    Intent.ACTION_SCREEN_ON -> {
-                        screenOn = true
-                        updatePlayback()
-                    }
-                    NotificationManager.ACTION_INTERRUPTION_FILTER_CHANGED -> {
-                        if (isDndActive()) {
-                            pendingUnlockAudio = false
-                            stopAudio()
-                        }
-                    }
-                }
-            }
-        }
-
-        override fun onCreate(surfaceHolder: SurfaceHolder) {
-            super.onCreate(surfaceHolder)
-            val filter = IntentFilter().apply {
-                addAction(Intent.ACTION_SCREEN_OFF)
-                addAction(Intent.ACTION_SCREEN_ON)
-                addAction(Intent.ACTION_USER_PRESENT)
-                addAction(NotificationManager.ACTION_INTERRUPTION_FILTER_CHANGED)
-            }
-            if (Build.VERSION.SDK_INT >= 33) registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
-            else @Suppress("DEPRECATION") registerReceiver(receiver, filter)
-            receiverRegistered = true
-        }
+        private var player: MediaPlayer? = null
+        private var surfaceReady = false
+        private var visibleNow = false
+        private var prepared = false
+        private var destroyed = false
+        private var generation = 0
 
         override fun onSurfaceCreated(holder: SurfaceHolder) {
             super.onSurfaceCreated(holder)
-            holderRef = holder
-            createPlayer(holder)
+            Log.i(tag, "surfaceCreated")
+            surfaceReady = true
+            startPreparing(holder)
+        }
+
+        override fun onSurfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
+            super.onSurfaceChanged(holder, format, width, height)
+            Log.i(tag, "surfaceChanged ${width}x${height}")
+            if (surfaceReady && player == null) startPreparing(holder)
             updatePlayback()
         }
 
-        override fun onSurfaceDestroyed(holder: SurfaceHolder) {
-            pausePlayback()
-            releasePlayer()
-            holderRef = null
-            super.onSurfaceDestroyed(holder)
-        }
-
         override fun onVisibilityChanged(visible: Boolean) {
-            homeVisible = visible
-            if (!visible) {
-                pausePlayback()
-            } else {
-                updatePlayback()
-            }
+            super.onVisibilityChanged(visible)
+            visibleNow = visible
+            Log.i(tag, "visibility=$visible preview=$isPreview")
+            updatePlayback()
         }
 
-        private fun isDndActive(): Boolean = try {
-            // A lack of policy access must not be interpreted as DND being enabled.
-            notificationManager.currentInterruptionFilter != NotificationManager.INTERRUPTION_FILTER_ALL
-        } catch (_: SecurityException) {
-            // Fail closed for audio when the OS prevents checking DND.
-            true
-        } catch (_: Exception) { true }
-
-        private fun createPlayer(holder: SurfaceHolder) {
+        private fun startPreparing(holder: SurfaceHolder) {
+            if (!holder.surface.isValid || destroyed) {
+                Log.w(tag, "Surface not valid yet")
+                return
+            }
             releasePlayer()
+            val token = ++generation
             try {
-                player = MediaPlayer.create(this@VideoWallpaperService, R.raw.wallpaper_video)?.apply {
-                    setSurface(holder.surface)
-                    isLooping = true
-                    setVolume(0f, 0f)
+                // Configure the display BEFORE preparing. MediaPlayer.create()
+                // prepares immediately and can fail to render on some wallpaper surfaces.
+                val p = MediaPlayer()
+                player = p
+                val afd = resources.openRawResourceFd(R.raw.wallpaper_video)
+                    ?: error("MP4 raw resource descriptor unavailable")
+                try {
+                    p.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                } finally {
+                    afd.close()
                 }
-            } catch (_: Exception) { player = null }
+                p.setDisplay(holder)
+                p.setVolume(0f, 0f)
+                p.isLooping = true
+                p.setOnPreparedListener {
+                    if (token != generation || destroyed) return@setOnPreparedListener
+                    prepared = true
+                    Log.i(tag, "prepared duration=${it.duration} video=${it.videoWidth}x${it.videoHeight}")
+                    updatePlayback()
+                }
+                p.setOnErrorListener { _, what, extra ->
+                    Log.e(tag, "MediaPlayer error what=$what extra=$extra")
+                    true
+                }
+                p.setOnInfoListener { _, what, extra ->
+                    Log.i(tag, "MediaPlayer info what=$what extra=$extra")
+                    false
+                }
+                p.prepareAsync()
+            } catch (e: Exception) {
+                Log.e(tag, "prepare failed", e)
+                releasePlayer()
+            }
         }
 
         private fun updatePlayback() {
-            if (!homeVisible || !screenOn || keyguard.isKeyguardLocked) {
-                pausePlayback()
-                return
-            }
-            if (player == null) holderRef?.let { createPlayer(it) }
             val p = player ?: return
+            if (!prepared) return
+            // Preview is rendered in a separate wallpaper picker activity.
+            val canPlay = visibleNow && surfaceReady &&
+                (isPreview || !keyguard.isKeyguardLocked)
             try {
-                if (pendingUnlockAudio) {
-                    pendingUnlockAudio = false
-                    if (!isDndActive()) {
-                        handler.removeCallbacks(muteAfterFirstLoop)
-                        p.seekTo(0)
-                        p.setVolume(1f, 1f)
-                        audioPlaying = true
-                        handler.postDelayed(muteAfterFirstLoop, p.duration.toLong().coerceAtLeast(1000L))
-                    } else stopAudio()
-                } else if (!audioPlaying) p.setVolume(0f, 0f)
-                if (!p.isPlaying) p.start()
-            } catch (_: Exception) {
-                stopAudio()
+                if (canPlay) {
+                    if (!p.isPlaying) {
+                        Log.i(tag, "play")
+                        p.start()
+                    }
+                } else if (p.isPlaying) {
+                    Log.i(tag, "pause")
+                    p.pause()
+                }
+            } catch (e: Exception) {
+                Log.e(tag, "playback transition failed", e)
             }
-        }
-
-        private fun stopAudio() {
-            handler.removeCallbacks(muteAfterFirstLoop)
-            audioPlaying = false
-            try { player?.setVolume(0f, 0f) } catch (_: Exception) {}
-        }
-
-        private fun pausePlayback() {
-            stopAudio()
-            try { player?.pause() } catch (_: Exception) {}
         }
 
         private fun releasePlayer() {
-            stopAudio()
-            try { player?.release() } catch (_: Exception) {}
+            ++generation
+            prepared = false
+            val p = player
             player = null
+            try { p?.reset() } catch (_: Exception) {}
+            try { p?.release() } catch (_: Exception) {}
+        }
+
+        override fun onSurfaceDestroyed(holder: SurfaceHolder) {
+            surfaceReady = false
+            releasePlayer()
+            super.onSurfaceDestroyed(holder)
         }
 
         override fun onDestroy() {
-            if (receiverRegistered) {
-                try { unregisterReceiver(receiver) } catch (_: Exception) {}
-                receiverRegistered = false
-            }
+            destroyed = true
+            main.removeCallbacksAndMessages(null)
             releasePlayer()
             super.onDestroy()
         }
