@@ -27,7 +27,7 @@ class MainActivity : Activity() {
         }
         val scroller = ScrollView(this).apply { addView(root) }
         root.addView(TextView(this).apply {
-            text = "Home Video Wallpaper v0.1.5 — surface diagnostics\nAudio intentionally disabled in this test build."
+            text = "Home Video Wallpaper v0.1.6 — direct video diagnostics\nAudio intentionally disabled in this test build."
             textSize = 19f
         })
         status = TextView(this).apply { text = "Embedded MP4: not tested"; textSize = 16f }
@@ -69,7 +69,7 @@ class MainActivity : Activity() {
             setOnClickListener { refreshStatus() }
         })
         root.addView(TextView(this).apply {
-            text = "Instructions: Test embedded MP4 here first. Then open Preview for 15 seconds. Look for a BLUE screen with YELLOW text during the first 4 seconds., Return here and tap Refresh. Screenshot the event history and Preview."
+            text = "Instructions: Test embedded MP4 here first. Then open Preview for 15 seconds. The video should start directly, without a blue test screen. Return here and tap Refresh. Screenshot the event history and Preview."
         })
         setContentView(scroller)
         refreshStatus()

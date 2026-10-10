@@ -1,11 +1,7 @@
-# Redmi Video Wallpaper v0.1.5 — Surface diagnostic
+# Redmi Video Wallpaper v0.1.6
 
-Diagnostic only: no audio. Embedded MP4 unchanged.
+Diagnostic build: starts MediaPlayer directly on the wallpaper Surface (no canvas test pattern or delayed switch). MP4 embedded; audio muted intentionally.
 
-1. Open app and test embedded MP4 (should play silently).
-2. Open live wallpaper preview and watch first 4 seconds. A BLUE screen with YELLOW "WALLPAPER SURFACE OK" text should appear before video preparation begins.
-3. Wait another 15 seconds. Return to app and refresh event history; screenshot it and the Preview result.
+Build via GitHub Actions, install APK, open Live Wallpaper Preview for 15 seconds, return to the app and press Refresh Wallpaper Diagnostics. Screenshot Preview and event history.
 
-The test distinguishes whether wallpaper canvas can render at all from MediaPlayer video rendering. It does not claim to fix black video. Do not use this build as a final wallpaper.
-
-Upload extracted files to the repository root, preserving `.github/workflows/build-apk.yml`. Commit to trigger GitHub Actions.
+This build is not device-tested. The unlock-only audio and DND behavior are postponed until wallpaper video rendering works.

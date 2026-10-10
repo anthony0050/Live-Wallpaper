@@ -1,8 +1,5 @@
 package com.anthony.redmiwallpaper
 
-import android.graphics.Color
-import android.graphics.Paint
-import android.app.KeyguardManager
 import android.content.Context
 import android.media.MediaPlayer
 import android.os.Handler
@@ -11,163 +8,123 @@ import android.service.wallpaper.WallpaperService
 import android.util.Log
 import android.view.SurfaceHolder
 
-/**
- * v0.1.5: surface test pattern and timeline diagnostic build.
- * Audio is intentionally disabled until video rendering is verified on-device.
- */
+/** v0.1.6: direct video output diagnostic. Audio is intentionally muted. */
 class VideoWallpaperService : WallpaperService() {
     override fun onCreateEngine(): Engine = VideoEngine()
 
     inner class VideoEngine : Engine() {
-        private val tag = "RedmiWallpaper"
-        private val main = Handler(Looper.getMainLooper())
-        private fun record(message: String) {
-            Log.i(tag, message)
-            getSharedPreferences("wallpaper_diagnostics", Context.MODE_PRIVATE).edit()
-                .putString("last_event", message)
-                .putString("history", ((getSharedPreferences("wallpaper_diagnostics", Context.MODE_PRIVATE).getString("history", "") ?: "") + "\n" + System.currentTimeMillis() + " " + message).takeLast(4500))
-                .putString("last_time", java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date()))
-                .apply()
-        }
-        private val keyguard by lazy { getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager }
+        private val handler = Handler(Looper.getMainLooper())
         private var player: MediaPlayer? = null
         private var surfaceReady = false
-        private var visibleNow = false
+        private var visible = false
         private var prepared = false
         private var destroyed = false
         private var generation = 0
+        private var surfaceWidth = 0
+        private var surfaceHeight = 0
+
+        private fun record(message: String) {
+            Log.i("RedmiWallpaper", message)
+            val prefs = getSharedPreferences("wallpaper_diagnostics", Context.MODE_PRIVATE)
+            val previous = prefs.getString("history", "") ?: ""
+            prefs.edit()
+                .putString("history", (previous + "\n" + System.currentTimeMillis() + " " + message).takeLast(6500))
+                .putString("last_time", java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date()))
+                .commit()
+        }
 
         override fun onSurfaceCreated(holder: SurfaceHolder) {
             super.onSurfaceCreated(holder)
-            record("surfaceCreated valid=${holder.surface.isValid}")
-            surfaceReady = true
-            drawTestPattern(holder)
-            main.postDelayed({ if (surfaceReady && !destroyed && player == null) startPreparing(holder) }, 4000)
+            surfaceReady = holder.surface.isValid
+            record("surfaceCreated valid=$surfaceReady preview=$isPreview")
+            // Do not lockCanvas here: decoder must own the wallpaper surface.
+            if (surfaceReady) prepareVideo(holder)
         }
 
         override fun onSurfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
             super.onSurfaceChanged(holder, format, width, height)
-            record("surfaceChanged ${width}x${height}")
-            if (surfaceReady && player == null) {
-                drawTestPattern(holder)
-                main.postDelayed({ if (surfaceReady && !destroyed && player == null) startPreparing(holder) }, 4000)
-            }
+            surfaceWidth = width
+            surfaceHeight = height
+            surfaceReady = holder.surface.isValid
+            record("surfaceChanged ${width}x${height} valid=$surfaceReady player=${player != null}")
+            if (surfaceReady && player == null) prepareVideo(holder)
             updatePlayback()
         }
 
         override fun onVisibilityChanged(visible: Boolean) {
             super.onVisibilityChanged(visible)
-            visibleNow = visible
-            record("visibility=$visible preview=$isPreview")
+            this.visible = visible
+            record("visibility=$visible preview=$isPreview prepared=$prepared")
             updatePlayback()
         }
 
-        private fun drawTestPattern(holder: SurfaceHolder) {
-            var canvas: android.graphics.Canvas? = null
-            try {
-                canvas = holder.lockCanvas()
-                if (canvas == null) {
-                    record("TEST PATTERN: lockCanvas returned null")
-                    return
-                }
-                canvas.drawColor(Color.rgb(20, 75, 155))
-                val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = Color.YELLOW
-                    textSize = 42f
-                    isFakeBoldText = true
-                }
-                canvas.drawText("WALLPAPER SURFACE OK", 24f, 110f, paint)
-                paint.color = Color.WHITE
-                paint.textSize = 30f
-                canvas.drawText("v0.1.5 - first 4 seconds", 24f, 165f, paint)
-                record("TEST PATTERN drawn ${canvas.width}x${canvas.height}")
-            } catch (e: Exception) {
-                record("TEST PATTERN ERROR ${e.javaClass.simpleName}: ${e.message}")
-            } finally {
-                if (canvas != null) try { holder.unlockCanvasAndPost(canvas) } catch (e: Exception) {
-                    record("unlockCanvasAndPost ERROR: ${e.message}")
-                }
-            }
-        }
-
-        private fun startPreparing(holder: SurfaceHolder) {
-            if (!holder.surface.isValid || destroyed) {
-                record("Surface not valid yet")
-                return
-            }
-            releasePlayer()
+        private fun prepareVideo(holder: SurfaceHolder) {
+            if (!surfaceReady || destroyed || player != null) return
             val token = ++generation
+            record("prepare begin token=$token surface=${holder.surface.isValid} size=${surfaceWidth}x$surfaceHeight")
             try {
-                // Configure the display BEFORE preparing. MediaPlayer.create()
-                // prepares immediately and can fail to render on some wallpaper surfaces.
-                val p = MediaPlayer()
-                player = p
+                val mp = MediaPlayer()
+                player = mp
                 val afd = resources.openRawResourceFd(R.raw.wallpaper_video)
-                    ?: error("MP4 raw resource descriptor unavailable")
+                    ?: error("Video resource descriptor unavailable")
                 try {
-                    p.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                    mp.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
                 } finally {
                     afd.close()
                 }
-                p.setDisplay(holder)
-                p.setVolume(0f, 0f)
-                p.isLooping = true
-                p.setOnPreparedListener {
+                mp.setDisplay(holder)
+                mp.setVolume(0f, 0f)
+                mp.isLooping = true
+                mp.setOnPreparedListener {
                     if (token != generation || destroyed) return@setOnPreparedListener
                     prepared = true
-                    record("prepared duration=${it.duration} video=${it.videoWidth}x${it.videoHeight}")
+                    record("prepared duration=${it.duration} dimensions=${it.videoWidth}x${it.videoHeight}")
                     updatePlayback()
                 }
-                p.setOnErrorListener { _, what, extra ->
-                    record("MediaPlayer ERROR what=$what extra=$extra")
+                mp.setOnVideoSizeChangedListener { _, w, h -> record("videoSizeChanged ${w}x$h") }
+                mp.setOnErrorListener { _, what, extra ->
+                    record("PLAYER ERROR what=$what extra=$extra")
                     true
                 }
-                p.setOnInfoListener { _, what, extra ->
-                    record("MediaPlayer info what=$what extra=$extra")
+                mp.setOnInfoListener { _, what, extra ->
+                    record("playerInfo what=$what extra=$extra")
                     false
                 }
-                p.prepareAsync()
+                mp.prepareAsync()
+                record("prepareAsync submitted")
             } catch (e: Exception) {
-                record("prepare failed: ${e.javaClass.simpleName}: ${e.message}")
-                Log.e(tag, "prepare failed", e)
+                record("PREPARE EXCEPTION ${e.javaClass.simpleName}: ${e.message}")
                 releasePlayer()
             }
         }
 
         private fun updatePlayback() {
-            val p = player ?: return
+            val mp = player ?: return
             if (!prepared) return
-            // Preview is rendered in a separate wallpaper picker activity.
-            val canPlay = visibleNow && surfaceReady &&
-                (isPreview || !keyguard.isKeyguardLocked)
+            val shouldPlay = surfaceReady && visible && !destroyed
             try {
-                if (canPlay) {
-                    if (!p.isPlaying) {
-                        record("play")
-                        p.start()
-                    }
-                } else if (p.isPlaying) {
-                    record("pause")
-                    p.pause()
+                if (shouldPlay && !mp.isPlaying) {
+                    mp.start()
+                    record("START preview=$isPreview")
+                } else if (!shouldPlay && mp.isPlaying) {
+                    mp.pause()
+                    record("PAUSE")
                 }
             } catch (e: Exception) {
-                record("playback transition failed: ${e.message}")
-                Log.e(tag, "playback transition failed", e)
+                record("PLAYBACK EXCEPTION ${e.javaClass.simpleName}: ${e.message}")
             }
         }
 
         private fun releasePlayer() {
-            ++generation
+            generation++
             prepared = false
-            val p = player
+            val old = player
             player = null
-            try { p?.reset() } catch (_: Exception) {}
-            try { p?.release() } catch (_: Exception) {}
+            try { old?.release() } catch (_: Exception) {}
         }
 
         override fun onSurfaceDestroyed(holder: SurfaceHolder) {
             surfaceReady = false
-            main.removeCallbacksAndMessages(null)
             releasePlayer()
             record("surfaceDestroyed")
             super.onSurfaceDestroyed(holder)
@@ -175,8 +132,9 @@ class VideoWallpaperService : WallpaperService() {
 
         override fun onDestroy() {
             destroyed = true
-            main.removeCallbacksAndMessages(null)
+            handler.removeCallbacksAndMessages(null)
             releasePlayer()
+            record("engineDestroyed")
             super.onDestroy()
         }
     }
